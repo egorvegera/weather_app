@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/models/post_model.dart';
@@ -20,9 +22,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _commentController = TextEditingController();
 
   Weather? _currentWeather;
-  final List<Post> _posts = [];
+  List<Post> _posts = [];
 
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosts();
+  }
+
+  /// Загрузка постов из SharedPreferences
+  Future<void> _loadPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final postsData = prefs.getStringList('posts') ?? [];
+    final loadedPosts = postsData
+        .map((e) {
+          try {
+            final jsonData = json.decode(e);
+            return Post.fromJson(jsonData);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<Post>()
+        .toList(); // фильтруем null
+
+    setState(() {
+      _posts = loadedPosts;
+    });
+  }
+
+  /// Сохранение постов в SharedPreferences
+  Future<void> _savePosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final postsData = _posts.map((e) => json.encode(e.toJson())).toList();
+    await prefs.setStringList('posts', postsData);
+  }
 
   Future<void> _getWeather() async {
     if (_cityController.text.isEmpty) return;
@@ -31,19 +67,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       final weather = await _weatherService.getWeather(_cityController.text);
+      if (!mounted) return;
       setState(() {
         _currentWeather = weather;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ошибка при получении погоды')),
       );
     } finally {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
 
-  void _publishPost() {
+  void _publishPost() async {
     if (_currentWeather == null || _commentController.text.isEmpty) return;
 
     final newPost = Post(
@@ -55,9 +94,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     setState(() {
-      _posts.insert(0, newPost); // добавляем пост в начало списка
+      _posts.insert(0, newPost);
       _commentController.clear();
     });
+
+    await _savePosts(); // сохраняем новые посты локально
   }
 
   @override
@@ -151,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 Text(post.comment),
                                 Text(
-                                  '${post.createdAt.hour}:${post.createdAt.minute}',
+                                  '${post.createdAt.hour}:${post.createdAt.minute.toString().padLeft(2, '0')}',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey,

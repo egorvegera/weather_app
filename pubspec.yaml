@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  shared_preferences: ^2.5.3
+
   # Material и iOS стиль иконок
   cupertino_icons: ^1.0.8
 

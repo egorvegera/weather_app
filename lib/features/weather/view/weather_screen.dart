@@ -17,14 +17,22 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Future<void> _getWeather(String city) async {
     try {
       final weather = await _service.getWeather(city);
+      if (!mounted) return; // защита от использования BuildContext после async
       setState(() {
         _weather = weather;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override

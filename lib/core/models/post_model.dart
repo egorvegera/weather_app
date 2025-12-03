@@ -8,11 +8,31 @@ class Post {
   final String comment;
   final DateTime createdAt;
 
-  const Post({
+  Post({
     required this.id,
     required this.user,
     required this.weather,
     required this.comment,
     required this.createdAt,
   });
+
+  factory Post.fromJson(Map<String, dynamic> json) {
+    return Post(
+      id: json['id'],
+      user: User.fromJson(json['user']),
+      weather: Weather.fromJson(json['weather']),
+      comment: json['comment'],
+      createdAt: DateTime.parse(json['createdAt']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user': user.toJson(),
+      'weather': weather.toJson(),
+      'comment': comment,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
 }
