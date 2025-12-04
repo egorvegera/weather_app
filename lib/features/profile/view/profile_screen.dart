@@ -26,7 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Weather? _currentWeather;
   List<Post> _posts = [];
-  User? _currentUser; // исправлено
+  User? _currentUser;
 
   bool _isLoading = false;
 

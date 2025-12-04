@@ -1,26 +1,30 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
-import '../../../features/auth/view/reg_modal.dart';
 
-class AuthModal extends StatefulWidget {
-  const AuthModal({super.key});
+class RegistrationModal extends StatefulWidget {
+  const RegistrationModal({super.key});
 
   @override
-  State<AuthModal> createState() => _AuthModalState();
+  State<RegistrationModal> createState() => _RegistrationModalState();
 }
 
-class _AuthModalState extends State<AuthModal> {
+class _RegistrationModalState extends State<RegistrationModal> {
   final AuthService _authService = AuthService();
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Вход в приложение'),
+      title: const Text('Регистрация'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: 'Имя'),
+          ),
           TextField(
             controller: _emailController,
             decoration: const InputDecoration(labelText: 'Email'),
@@ -33,30 +37,14 @@ class _AuthModalState extends State<AuthModal> {
           const SizedBox(height: 10),
           ElevatedButton(
             onPressed: () async {
-              final user = await _authService.signInWithEmail(
+              final user = await _authService.registerWithEmail(
                 _emailController.text,
                 _passwordController.text,
+                _nameController.text,
               );
               if (user != null && context.mounted) Navigator.pop(context);
             },
-            child: const Text('Войти'),
-          ),
-          TextButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => const RegistrationModal(),
-              );
-            },
-            child: const Text('Регистрация'),
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () async {
-              final user = await _authService.signInAnonymously();
-              if (user != null && context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Войти анонимно'),
+            child: const Text('Зарегистрироваться'),
           ),
         ],
       ),
