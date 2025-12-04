@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "624298730256",
+    "project_id": "weather-app-vei",
+    "storage_bucket": "weather-app-vei.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:624298730256:android:41f6c838c4dd13e391fb95",
+        "android_client_info": {
+          "package_name": "com.example.weather_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4UJ_-a6f6w8YWSBRTVUMAUuwAydHSXtk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

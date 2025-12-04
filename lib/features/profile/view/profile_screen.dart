@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import '../../../core/models/user_model.dart';
 import '../../../core/models/post_model.dart';
 import '../../../core/models/weather_model.dart';
+import '../../../core/models/user_model.dart'; // User
 import '../../../core/services/weather_service.dart';
+import '../../../core/services/local_storage_service.dart';
+import '../../../core/services/auth_service.dart';
+import '../../auth/view/auth_modal.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,79 +17,72 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final User currentUser = User(id: 'u1', name: 'Иван', photoUrl: null);
   final WeatherService _weatherService = WeatherService();
+  final LocalStorageService _storageService = LocalStorageService();
+  final AuthService _authService = AuthService();
 
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _commentController = TextEditingController();
 
   Weather? _currentWeather;
   List<Post> _posts = [];
+  User? _currentUser; // исправлено
 
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _initUser();
     _loadPosts();
   }
 
-  /// Загрузка постов из SharedPreferences
-  Future<void> _loadPosts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final postsData = prefs.getStringList('posts') ?? [];
-    final loadedPosts = postsData
-        .map((e) {
-          try {
-            final jsonData = json.decode(e);
-            return Post.fromJson(jsonData);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<Post>()
-        .toList(); // фильтруем null
+  void _initUser() {
+    final firebaseUser = _authService.currentUser;
+    if (firebaseUser != null) {
+      _currentUser = User(
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName ?? 'Аноним',
+        photoUrl: firebaseUser.photoURL,
+      );
+    }
+  }
 
+  Future<void> _loadPosts() async {
+    final loadedPosts = await _storageService.loadPosts();
     setState(() {
       _posts = loadedPosts;
     });
   }
 
-  /// Сохранение постов в SharedPreferences
   Future<void> _savePosts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final postsData = _posts.map((e) => json.encode(e.toJson())).toList();
-    await prefs.setStringList('posts', postsData);
+    await _storageService.savePosts(_posts);
   }
 
   Future<void> _getWeather() async {
     if (_cityController.text.isEmpty) return;
-
     setState(() => _isLoading = true);
-
     try {
       final weather = await _weatherService.getWeather(_cityController.text);
-      if (!mounted) return;
-      setState(() {
-        _currentWeather = weather;
-      });
-    } catch (e) {
-      if (!mounted) return;
+      setState(() => _currentWeather = weather);
+    } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ошибка при получении погоды')),
       );
     } finally {
-      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
 
   void _publishPost() async {
-    if (_currentWeather == null || _commentController.text.isEmpty) return;
+    if (_currentWeather == null ||
+        _commentController.text.isEmpty ||
+        _currentUser == null)
+      return;
 
     final newPost = Post(
       id: const Uuid().v4(),
-      user: currentUser,
+      user: _currentUser!, // User
       weather: _currentWeather!,
       comment: _commentController.text,
       createdAt: DateTime.now(),
@@ -98,25 +93,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _commentController.clear();
     });
 
-    await _savePosts(); // сохраняем новые посты локально
-  }
-
-  @override
-  void dispose() {
-    _cityController.dispose();
-    _commentController.dispose();
-    super.dispose();
+    await _savePosts();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Профиль')),
+      appBar: AppBar(
+        title: const Text('Профиль'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.login),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => AuthModal(),
+              ).then((_) => _initUser());
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await _authService.signOut();
+              setState(() => _currentUser = null);
+            },
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Ввод города для погоды
             Row(
               children: [
                 Expanded(
@@ -134,20 +141,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-
-            // Отображение текущей погоды
             if (_isLoading) const CircularProgressIndicator(),
             if (_currentWeather != null && !_isLoading)
               Text(
-                '${_currentWeather!.city}, ${_currentWeather!.country}\n'
-                '${_currentWeather!.temperature} °C, ${_currentWeather!.condition}',
+                '${_currentWeather!.city}, ${_currentWeather!.country}\n${_currentWeather!.temperature} °C, ${_currentWeather!.condition}',
                 textAlign: TextAlign.center,
               ),
-
-            const SizedBox(height: 10),
-
-            // Поле для комментария и кнопка публикации
             TextField(
               controller: _commentController,
               decoration: const InputDecoration(
@@ -159,10 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: _publishPost,
               child: const Text('Опубликовать пост'),
             ),
-
             const SizedBox(height: 20),
-
-            // Список постов
             Expanded(
               child: _posts.isEmpty
                   ? const Center(child: Text('Постов пока нет'))
