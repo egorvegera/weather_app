@@ -1,5 +1,7 @@
+// lib/features/auth/view/auth_modal.dart
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
+import 'reg_modal.dart';
 
 class AuthModal extends StatelessWidget {
   final AuthService _authService = AuthService();
@@ -96,9 +98,16 @@ class AuthModal extends StatelessWidget {
             icon: const Icon(Icons.person_add),
             label: const Text('Регистрация'),
             onPressed: () async {
-              // Здесь можно вызывать отдельную модалку регистрации
               if (context.mounted) {
-                Navigator.pushNamed(context, '/reg'); // Например, роут /reg
+                // Показываем модалку регистрации
+                await showDialog(
+                  context: context,
+                  builder: (_) => RegModal(
+                    onUserRegistered: () {
+                      if (onUserChanged != null) onUserChanged!();
+                    },
+                  ),
+                );
               }
             },
           ),

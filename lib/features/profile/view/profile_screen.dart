@@ -1,3 +1,4 @@
+// lib/features/profile/view/profile_screen.dart
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -181,23 +182,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             // Аватар текущего пользователя
             if (_currentUser != null)
-              CircleAvatar(
-                radius: 40,
-                backgroundImage: _currentUser!.localPhotoPath != null
-                    ? (kIsWeb
-                          ? MemoryImage(
-                              base64Decode(_currentUser!.localPhotoPath!),
-                            )
-                          : FileImage(File(_currentUser!.localPhotoPath!))
-                                as ImageProvider)
-                    : (_currentUser!.photoUrl != null
-                          ? NetworkImage(_currentUser!.photoUrl!)
-                          : null),
-                child:
-                    (_currentUser!.localPhotoPath == null &&
-                        _currentUser!.photoUrl == null)
-                    ? Text(_currentUser!.name[0])
-                    : null,
+              Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundImage: _currentUser!.localPhotoPath != null
+                        ? (kIsWeb
+                              ? MemoryImage(
+                                  base64Decode(_currentUser!.localPhotoPath!),
+                                )
+                              : FileImage(File(_currentUser!.localPhotoPath!))
+                                    as ImageProvider)
+                        : (_currentUser!.photoUrl != null
+                              ? NetworkImage(_currentUser!.photoUrl!)
+                              : null),
+                    child:
+                        (_currentUser!.localPhotoPath == null &&
+                            _currentUser!.photoUrl == null)
+                        ? Text(_currentUser!.name[0])
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _currentUser!.name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
 
             const SizedBox(height: 20),
