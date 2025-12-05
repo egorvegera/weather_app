@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../features/weather/view/weather_screen.dart';
 import '../features/profile/view/profile_screen.dart';
 import '../features/feed/view/feed_screen.dart';
+import 'routes.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -12,6 +13,7 @@ class MyApp extends StatelessWidget {
       title: 'Weather App',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const HomeScreen(),
+      onGenerateRoute: AppRoutes.generateRoute, // <-- добавлено
     );
   }
 }

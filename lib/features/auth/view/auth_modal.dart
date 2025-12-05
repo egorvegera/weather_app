@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
-import '../../../features/auth/view/reg_modal.dart';
 
-class AuthModal extends StatefulWidget {
-  const AuthModal({super.key});
-
-  @override
-  State<AuthModal> createState() => _AuthModalState();
-}
-
-class _AuthModalState extends State<AuthModal> {
+class AuthModal extends StatelessWidget {
   final AuthService _authService = AuthService();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+
+  /// Callback вызывается после успешного входа пользователя
+  final VoidCallback? onUserChanged;
+
+  AuthModal({super.key, this.onUserChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -21,42 +16,91 @@ class _AuthModalState extends State<AuthModal> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
-            controller: _emailController,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-          TextField(
-            controller: _passwordController,
-            decoration: const InputDecoration(labelText: 'Пароль'),
-            obscureText: true,
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
+          ElevatedButton.icon(
+            icon: const Icon(Icons.login),
+            label: const Text('Войти через Email'),
             onPressed: () async {
-              final user = await _authService.signInWithEmail(
-                _emailController.text,
-                _passwordController.text,
-              );
-              if (user != null && context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Войти'),
-          ),
-          TextButton(
-            onPressed: () {
-              showDialog(
+              // Показываем диалог для ввода email и пароля
+              final result = await showDialog<Map<String, String>>(
                 context: context,
-                builder: (_) => const RegistrationModal(),
+                builder: (_) {
+                  final emailController = TextEditingController();
+                  final passwordController = TextEditingController();
+                  return AlertDialog(
+                    title: const Text('Email вход'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: emailController,
+                          decoration: const InputDecoration(labelText: 'Email'),
+                        ),
+                        TextField(
+                          controller: passwordController,
+                          decoration: const InputDecoration(
+                            labelText: 'Пароль',
+                          ),
+                          obscureText: true,
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Отмена'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context, {
+                            'email': emailController.text,
+                            'password': passwordController.text,
+                          });
+                        },
+                        child: const Text('Войти'),
+                      ),
+                    ],
+                  );
+                },
               );
+
+              if (result != null) {
+                final user = await _authService.signInWithEmail(
+                  result['email']!,
+                  result['password']!,
+                );
+                if (user != null && context.mounted) {
+                  Navigator.pop(context); // Закрываем модалку входа
+                  if (onUserChanged != null) onUserChanged!();
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Ошибка входа')));
+                }
+              }
             },
-            child: const Text('Регистрация'),
           ),
           const SizedBox(height: 10),
-          ElevatedButton(
+          ElevatedButton.icon(
+            icon: const Icon(Icons.person_outline),
+            label: const Text('Войти анонимно'),
             onPressed: () async {
               final user = await _authService.signInAnonymously();
-              if (user != null && context.mounted) Navigator.pop(context);
+              if (user != null && context.mounted) {
+                Navigator.pop(context); // Закрываем модалку
+                if (onUserChanged != null) onUserChanged!();
+              }
             },
-            child: const Text('Войти анонимно'),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.person_add),
+            label: const Text('Регистрация'),
+            onPressed: () async {
+              // Здесь можно вызывать отдельную модалку регистрации
+              if (context.mounted) {
+                Navigator.pushNamed(context, '/reg'); // Например, роут /reg
+              }
+            },
           ),
         ],
       ),

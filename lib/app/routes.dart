@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
-import '../features/weather/view/weather_screen.dart';
 import '../features/profile/view/profile_screen.dart';
-import '../features/feed/view/feed_screen.dart';
 import '../features/settings/view/settings_screen.dart';
-import '../features/profile/view/other_profile_screen.dart';
+import '../core/models/user_model.dart';
 
 class AppRoutes {
-  static const String weather = '/weather';
-  static const String profile = '/profile';
-  static const String feed = '/feed';
-  static const String settings = '/settings';
-  static const String otherProfile = '/other_profile';
+  static const profile = '/profile';
+  static const settings = '/settings';
 
-  static Map<String, WidgetBuilder> get routes {
-    return {
-      weather: (context) => const WeatherScreen(),
-      profile: (context) => const ProfileScreen(),
-      feed: (context) => const FeedScreen(),
-      settings: (context) => const SettingsScreen(),
-      otherProfile: (context) => const OtherProfileScreen(),
-    };
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    final name = settings.name;
+    final args = settings.arguments as User?;
+
+    if (name == '/profile') {
+      return MaterialPageRoute(
+        builder: (_) => ProfileScreen(currentUser: args),
+      );
+    } else if (name == '/settings') {
+      return MaterialPageRoute(
+        builder: (_) => SettingsScreen(currentUser: args),
+      );
+    } else {
+      return MaterialPageRoute(
+        builder: (_) =>
+            const Scaffold(body: Center(child: Text('Страница не найдена'))),
+      );
+    }
   }
 }

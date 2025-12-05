@@ -1,7 +1,7 @@
 class User {
   final String id;
   final String name;
-  final String? photoUrl;
+  String? photoUrl; // Сделали изменяемым
 
   User({required this.id, required this.name, this.photoUrl});
 

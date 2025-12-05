@@ -1,16 +1,18 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/post_model.dart';
 import '../../../core/models/weather_model.dart';
-import '../../../core/models/user_model.dart'; // User
+import '../../../core/models/user_model.dart';
 import '../../../core/services/weather_service.dart';
 import '../../../core/services/local_storage_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../auth/view/auth_modal.dart';
+import '../../../app/routes.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final User? currentUser;
+
+  const ProfileScreen({super.key, this.currentUser});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -33,26 +35,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _initUser();
+    _currentUser = widget.currentUser ?? _getAuthUser();
     _loadPosts();
   }
 
-  void _initUser() {
+  User? _getAuthUser() {
     final firebaseUser = _authService.currentUser;
-    if (firebaseUser != null) {
-      _currentUser = User(
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName ?? 'Аноним',
-        photoUrl: firebaseUser.photoURL,
-      );
-    }
+    return firebaseUser != null
+        ? User(
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName ?? 'Аноним',
+            photoUrl: firebaseUser.photoURL,
+          )
+        : null;
   }
 
   Future<void> _loadPosts() async {
     final loadedPosts = await _storageService.loadPosts();
-    setState(() {
-      _posts = loadedPosts;
-    });
+    if (!mounted) return;
+    setState(() => _posts = loadedPosts);
   }
 
   Future<void> _savePosts() async {
@@ -62,27 +63,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _getWeather() async {
     if (_cityController.text.isEmpty) return;
     setState(() => _isLoading = true);
+
     try {
       final weather = await _weatherService.getWeather(_cityController.text);
-      setState(() => _currentWeather = weather);
+      if (mounted) setState(() => _currentWeather = weather);
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка при получении погоды')),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Ошибка погоды')));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _publishPost() async {
-    if (_currentWeather == null ||
-        _commentController.text.isEmpty ||
-        _currentUser == null)
+    if (_currentWeather == null) return;
+    if (_commentController.text.isEmpty) return;
+    if (_currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сначала войдите в аккаунт')),
+      );
       return;
+    }
 
     final newPost = Post(
       id: const Uuid().v4(),
-      user: _currentUser!, // User
+      user: _currentUser!,
       weather: _currentWeather!,
       comment: _commentController.text,
       createdAt: DateTime.now(),
@@ -102,22 +109,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('Профиль'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.login),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => AuthModal(),
-              ).then((_) => _initUser());
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await _authService.signOut();
-              setState(() => _currentUser = null);
-            },
-          ),
+          if (_currentUser != null)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.settings,
+                  arguments: _currentUser,
+                );
+              },
+            ),
+          if (_currentUser == null)
+            IconButton(
+              icon: const Icon(Icons.login),
+              onPressed: () {
+                showDialog(context: context, builder: (_) => AuthModal()).then((
+                  _,
+                ) {
+                  final user = _getAuthUser();
+                  if (mounted && user != null)
+                    setState(() => _currentUser = user);
+                });
+              },
+            ),
+          if (_currentUser != null)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                await _authService.signOut();
+                if (mounted) setState(() => _currentUser = null);
+              },
+            ),
         ],
       ),
       body: Padding(
@@ -141,11 +164,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            if (_isLoading) const CircularProgressIndicator(),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 20),
+                child: CircularProgressIndicator(),
+              ),
             if (_currentWeather != null && !_isLoading)
-              Text(
-                '${_currentWeather!.city}, ${_currentWeather!.country}\n${_currentWeather!.temperature} °C, ${_currentWeather!.condition}',
-                textAlign: TextAlign.center,
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  '${_currentWeather!.city}, ${_currentWeather!.country}\n'
+                  '${_currentWeather!.temperature}°C, ${_currentWeather!.condition}',
+                  textAlign: TextAlign.center,
+                ),
               ),
             TextField(
               controller: _commentController,
@@ -184,11 +215,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${post.weather.temperature} °C, ${post.weather.condition}',
+                                  '${post.weather.temperature}°C, ${post.weather.condition}',
                                 ),
                                 Text(post.comment),
                                 Text(
-                                  '${post.createdAt.hour}:${post.createdAt.minute.toString().padLeft(2, '0')}',
+                                  '${post.createdAt.hour.toString().padLeft(2, '0')}:'
+                                  '${post.createdAt.minute.toString().padLeft(2, '0')}',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey,

@@ -21,36 +21,38 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _loadPosts() async {
     final loadedPosts = await _storageService.loadPosts();
-    setState(() => _posts = loadedPosts);
+    if (mounted) setState(() => _posts = loadedPosts);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Лента пользователей')),
-      body: ListView.builder(
-        itemCount: _posts.length,
-        itemBuilder: (context, index) {
-          final post = _posts[index];
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundImage: post.user.photoUrl != null
-                    ? NetworkImage(post.user.photoUrl!)
-                    : null,
-                child: post.user.photoUrl == null
-                    ? Text(post.user.name[0])
-                    : null,
-              ),
-              title: Text('${post.user.name} — ${post.weather.city}'),
-              subtitle: Text(
-                '${post.weather.temperature} °C, ${post.weather.condition}\n${post.comment}',
-              ),
+      body: _posts.isEmpty
+          ? const Center(child: Text('Постов пока нет'))
+          : ListView.builder(
+              itemCount: _posts.length,
+              itemBuilder: (context, index) {
+                final post = _posts[index];
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: post.user.photoUrl != null
+                          ? NetworkImage(post.user.photoUrl!)
+                          : null,
+                      child: post.user.photoUrl == null
+                          ? Text(post.user.name[0])
+                          : null,
+                    ),
+                    title: Text('${post.user.name} — ${post.weather.city}'),
+                    subtitle: Text(
+                      '${post.weather.temperature} °C, ${post.weather.condition}\n${post.comment}',
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

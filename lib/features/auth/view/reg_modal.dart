@@ -1,53 +1,81 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
 
-class RegistrationModal extends StatefulWidget {
-  const RegistrationModal({super.key});
-
-  @override
-  State<RegistrationModal> createState() => _RegistrationModalState();
-}
-
-class _RegistrationModalState extends State<RegistrationModal> {
+class RegModal extends StatelessWidget {
   final AuthService _authService = AuthService();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+
+  /// Callback вызывается после успешной регистрации
+  final VoidCallback? onUserRegistered;
+
+  RegModal({super.key, this.onUserRegistered});
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController emailController = TextEditingController();
+    final TextEditingController passwordController = TextEditingController();
+    final TextEditingController nameController = TextEditingController();
+
     return AlertDialog(
       title: const Text('Регистрация'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Имя'),
-          ),
-          TextField(
-            controller: _emailController,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-          TextField(
-            controller: _passwordController,
-            decoration: const InputDecoration(labelText: 'Пароль'),
-            obscureText: true,
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () async {
-              final user = await _authService.registerWithEmail(
-                _emailController.text,
-                _passwordController.text,
-                _nameController.text,
-              );
-              if (user != null && context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Зарегистрироваться'),
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Имя'),
+            ),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(labelText: 'Пароль'),
+              obscureText: true,
+            ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final email = emailController.text.trim();
+            final password = passwordController.text.trim();
+            final name = nameController.text.trim();
+
+            if (email.isEmpty || password.isEmpty || name.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Заполните все поля')),
+              );
+              return;
+            }
+
+            final user = await _authService.registerWithEmail(
+              email,
+              password,
+              name,
+            );
+
+            if (user != null && context.mounted) {
+              Navigator.pop(context); // Закрываем модалку регистрации
+              if (onUserRegistered != null) onUserRegistered!();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Регистрация успешна')),
+              );
+            } else if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ошибка регистрации')),
+              );
+            }
+          },
+          child: const Text('Зарегистрироваться'),
+        ),
+      ],
     );
   }
 }
