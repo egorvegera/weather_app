@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/post_model.dart';
@@ -35,8 +38,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _currentUser = widget.currentUser ?? _getAuthUser();
+    _initializeUser();
     _loadPosts();
+  }
+
+  Future<void> _initializeUser() async {
+    _currentUser = widget.currentUser ?? _getAuthUser();
+    if (_currentUser != null) {
+      // Загружаем локальное фото, если есть
+      final localPath = await _storageService.getUserPhotoPath(
+        _currentUser!.id,
+      );
+      if (localPath != null) {
+        setState(() {
+          _currentUser!.localPhotoPath = localPath;
+        });
+      }
+    }
   }
 
   User? _getAuthUser() {
@@ -53,7 +71,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadPosts() async {
     final loadedPosts = await _storageService.loadPosts();
     if (!mounted) return;
-    setState(() => _posts = loadedPosts);
+    setState(() {
+      _posts = loadedPosts;
+    });
   }
 
   Future<void> _savePosts() async {
@@ -71,7 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Ошибка погоды')));
+      ).showSnackBar(const SnackBar(content: Text('Ошибка получения погоды')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -103,6 +123,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _savePosts();
   }
 
+  /// Обновление локального фото пользователя после изменений в Settings
+  Future<void> _updateUserPhoto() async {
+    if (_currentUser == null) return;
+    final localPath = await _storageService.getUserPhotoPath(_currentUser!.id);
+    if (localPath != null) {
+      setState(() {
+        _currentUser!.localPhotoPath = localPath;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,7 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   context,
                   AppRoutes.settings,
                   arguments: _currentUser,
-                );
+                ).then((_) => _updateUserPhoto());
               },
             ),
           if (_currentUser == null)
@@ -128,8 +159,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _,
                 ) {
                   final user = _getAuthUser();
-                  if (mounted && user != null)
+                  if (mounted && user != null) {
                     setState(() => _currentUser = user);
+                  }
                 });
               },
             ),
@@ -147,6 +179,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Аватар текущего пользователя
+            if (_currentUser != null)
+              CircleAvatar(
+                radius: 40,
+                backgroundImage: _currentUser!.localPhotoPath != null
+                    ? (kIsWeb
+                          ? MemoryImage(
+                              base64Decode(_currentUser!.localPhotoPath!),
+                            )
+                          : FileImage(File(_currentUser!.localPhotoPath!))
+                                as ImageProvider)
+                    : (_currentUser!.photoUrl != null
+                          ? NetworkImage(_currentUser!.photoUrl!)
+                          : null),
+                child:
+                    (_currentUser!.localPhotoPath == null &&
+                        _currentUser!.photoUrl == null)
+                    ? Text(_currentUser!.name[0])
+                    : null,
+              ),
+
+            const SizedBox(height: 20),
+
             Row(
               children: [
                 Expanded(
@@ -164,11 +219,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
+
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 20),
                 child: CircularProgressIndicator(),
               ),
+
             if (_currentWeather != null && !_isLoading)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -178,17 +235,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
+
             TextField(
               controller: _commentController,
               decoration: const InputDecoration(
                 labelText: 'Комментарий о погоде',
               ),
             ),
+
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _publishPost,
               child: const Text('Опубликовать пост'),
             ),
+
             const SizedBox(height: 20),
             Expanded(
               child: _posts.isEmpty
@@ -201,10 +261,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           margin: const EdgeInsets.symmetric(vertical: 8),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundImage: post.user.photoUrl != null
-                                  ? NetworkImage(post.user.photoUrl!)
-                                  : null,
-                              child: post.user.photoUrl == null
+                              backgroundImage: post.user.localPhotoPath != null
+                                  ? (kIsWeb
+                                        ? MemoryImage(
+                                            base64Decode(
+                                              post.user.localPhotoPath!,
+                                            ),
+                                          )
+                                        : FileImage(
+                                                File(post.user.localPhotoPath!),
+                                              )
+                                              as ImageProvider)
+                                  : (post.user.photoUrl != null
+                                        ? NetworkImage(post.user.photoUrl!)
+                                        : null),
+                              child:
+                                  post.user.localPhotoPath == null &&
+                                      post.user.photoUrl == null
                                   ? Text(post.user.name[0])
                                   : null,
                             ),

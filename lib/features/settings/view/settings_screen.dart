@@ -1,10 +1,13 @@
+// lib/features/settings/view/settings_screen.dart
+import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/auth_service.dart';
-import '../../../core/services/local_storage_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final User? currentUser;
@@ -17,9 +20,9 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final AuthService _authService = AuthService();
-  final LocalStorageService _storageService = LocalStorageService();
 
-  File? _imageFile;
+  File? _imageFile; // Для мобильных платформ
+  String? _webImageBase64; // Для Web
 
   @override
   void initState() {
@@ -30,9 +33,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadUserPhoto() async {
     if (widget.currentUser == null) return;
 
-    final path = await _storageService.getUserPhotoPath(widget.currentUser!.id);
-    if (path != null) {
-      setState(() => _imageFile = File(path));
+    if (kIsWeb) {
+      // Web: загружаем Base64 из shared_preferences
+      final prefs = await SharedPreferences.getInstance();
+      final base64String = prefs.getString('${widget.currentUser!.id}_photo');
+      if (base64String != null) {
+        setState(() => _webImageBase64 = base64String);
+      }
+    } else {
+      // Мобильные: загружаем файл
+      final dir = await getApplicationDocumentsDirectory();
+      final filePath = '${dir.path}/${widget.currentUser!.id}_profile.png';
+      final file = File(filePath);
+      if (await file.exists()) {
+        setState(() => _imageFile = file);
+      }
     }
   }
 
@@ -41,12 +56,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
-    final appDir = await getApplicationDocumentsDirectory();
-    final fileName = '${widget.currentUser!.id}_profile.png';
-    final savedFile = await File(picked.path).copy('${appDir.path}/$fileName');
-
-    await _storageService.saveUserPhoto(widget.currentUser!.id, savedFile.path);
-    setState(() => _imageFile = savedFile);
+    if (kIsWeb) {
+      // Web: сохраняем Base64 в SharedPreferences
+      final bytes = await picked.readAsBytes();
+      final base64String = base64Encode(bytes);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('${widget.currentUser!.id}_photo', base64String);
+      setState(() => _webImageBase64 = base64String);
+    } else {
+      // Мобильные: сохраняем в File
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = '${widget.currentUser!.id}_profile.png';
+      final savedFile = await File(
+        picked.path,
+      ).copy('${appDir.path}/$fileName');
+      setState(() => _imageFile = savedFile);
+    }
   }
 
   Future<void> _signOut() async {
@@ -66,10 +91,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundImage: _imageFile != null
-                        ? FileImage(_imageFile!)
-                        : null,
-                    child: _imageFile == null
+                    backgroundImage: kIsWeb
+                        ? (_webImageBase64 != null
+                              ? MemoryImage(base64Decode(_webImageBase64!))
+                              : null)
+                        : (_imageFile != null ? FileImage(_imageFile!) : null),
+                    child: (_imageFile == null && _webImageBase64 == null)
                         ? Text(
                             widget.currentUser!.name[0],
                             style: const TextStyle(fontSize: 40),
